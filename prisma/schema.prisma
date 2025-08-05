@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String
+  role          String        // 'member' | 'staff' | 'admin'
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Member relations
+  applications  LoanApplication[]
+  
+  // Staff relations
+  reviewedApplications ApplicationReview[]
+  activities    ApplicationActivity[]
+}
+
+model LoanProduct {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  minAmount       Float
+  maxAmount       Float
+  minTerm         Int       // months
+  maxTerm         Int       // months
+  interestRate    Float
+  isActive        Boolean   @default(true)
+  requiredFields  String    // JSON string of required fields
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  applications    LoanApplication[]
+}
+
+model LoanApplication {
+  id                  String      @id @default(cuid())
+  applicationNumber   String      @unique
+  userId              String
+  productId           String
+  
+  // Loan details
+  amount              Float
+  term                Int         // months
+  purpose             String
+  monthlyPayment      Float?
+  
+  // Personal info
+  firstName           String?
+  lastName            String?
+  email               String?
+  dateOfBirth         String?
+  sin                 String?
+  phone               String?
+  address             String?
+  citizenshipStatus   String?
+  
+  // Address fields
+  streetNumber        String?
+  streetName          String?
+  unit                String?
+  city                String?
+  province            String?
+  postalCode          String?
+  yearsAtAddress      String?
+  monthsAtAddress     String?
+  // Previous address
+  prevStreetNumber    String?
+  prevStreetName      String?
+  prevUnit            String?
+  prevCity            String?
+  prevProvince        String?
+  prevPostalCode      String?
+  
+  // Employment info
+  employerName        String?
+  employmentStatus    String?
+  annualIncome        Float?
+  monthlyIncome       Float?
+  employmentDuration  String?
+  employmentYears     String?
+  employmentMonths    String?
+  
+  // Financial info
+  otherIncome         String?
+  monthlyHousingCost  String?
+  otherMonthlyDebts   String?
+  numberOfDependents  String?
+  
+  // Status
+  status              String      @default("draft") // draft, submitted, under_review, approved, denied, withdrawn
+  currentStep         Int         @default(1)
+  submittedAt         DateTime?
+  
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  
+  user                User        @relation(fields: [userId], references: [id])
+  product             LoanProduct @relation(fields: [productId], references: [id])
+  documents           Document[]
+  reviews             ApplicationReview[]
+  activities          ApplicationActivity[]
+}
+
+model Document {
+  id              String          @id @default(cuid())
+  applicationId   String
+  type            String          // 'id_front', 'id_back', 'pay_stub', 'bank_statement'
+  fileName        String
+  filePath        String
+  fileSize        Int
+  mimeType        String
+  uploadedAt      DateTime        @default(now())
+  
+  application     LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model ApplicationReview {
+  id              String          @id @default(cuid())
+  applicationId   String
+  reviewerId      String
+  decision        String          // 'approved', 'denied', 'more_info_needed'
+  notes           String?
+  createdAt       DateTime        @default(now())
+  
+  application     LoanApplication @relation(fields: [applicationId], references: [id])
+  reviewer        User            @relation(fields: [reviewerId], references: [id])
+}
+
+model ApplicationActivity {
+  id              String          @id @default(cuid())
+  applicationId   String
+  userId          String
+  action          String
+  details         String?
+  createdAt       DateTime        @default(now())
+  
+  application     LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id])
+}
+
+model CreditUnionSettings {
+  id                String    @id @default(cuid())
+  name              String
+  logo              String?
+  primaryColor      String    @default("#2563eb")
+  accentColor       String    @default("#3b82f6")
+  
+  // Application flow settings
+  requireSin        Boolean   @default(true)
+  requireEmployment Boolean   @default(true)
+  maxUploadSize     Int       @default(5242880) // 5MB
+  allowedFileTypes  String    @default("image/jpeg,image/png,application/pdf")
+  
+  // Email templates
+  approvalTemplate  String?
+  denialTemplate    String?
+  moreInfoTemplate  String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
