@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "postinstall": "prisma generate"
   },
   "repository": {
     "type": "git",
@@ -24,6 +25,7 @@
   },
   "homepage": "https://github.com/Rourke-Lowe/digitalLoans#readme",
   "dependencies": {
+    "@prisma/client": "^6.12.0",
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -37,7 +39,6 @@
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^15.4.4",
-    "@prisma/client": "^6.12.0",
     "@types/bcrypt": "^6.0.0",
     "@types/puppeteer": "^5.4.7",
     "@types/sqlite3": "^3.1.11",
