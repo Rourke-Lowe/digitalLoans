@@ -1,6 +1,83 @@
 # Digital Loans Application Platform
 
-A comprehensive digital loan application system designed for credit unions to streamline member loan applications and review processes.
+## 🚀 QUICK START - LOCAL SETUP INSTRUCTIONS
+
+### ⚠️ IMPORTANT: Follow these steps to run the application locally
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Rourke-Lowe/digitalLoans.git
+   cd digitalLoans
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Create the environment file:**
+   ```bash
+   echo "DATABASE_URL=\"file:./dev.db\"" > .env
+   ```
+
+4. **Initialize the database:**
+   ```bash
+   npx prisma db push
+   ```
+
+5. **Seed the database with test data:**
+   ```bash
+   npm run seed
+   ```
+
+6. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+7. **Open your browser and navigate to:**
+   ```
+   http://localhost:3000
+   ```
+
+### 📝 TEST ACCOUNTS
+
+Use these test accounts to login and explore the application:
+
+**Admin Account:**
+- Email: `admin@creditunion.com`
+- Role: Admin (full access)
+
+**Staff Account:**
+- Email: `staff@creditunion.com`
+- Role: Staff (can review applications)
+
+**Member Accounts:**
+- `john.doe@email.com` (Member)
+- `jane.smith@email.com` (Member)
+- `sarah.martin@email.com` (Member)
+
+**Note:** This application uses email-only authentication (no passwords required for testing).
+
+### ⚠️ TROUBLESHOOTING
+
+If you encounter any issues:
+
+1. **Port already in use:** The app runs on port 3000 by default. If this port is busy, it will automatically use port 3001 or 3002.
+
+2. **Database issues:** If you need to reset the database:
+   ```bash
+   rm prisma/dev.db
+   npx prisma db push
+   npm run seed
+   ```
+
+3. **Build errors:** Make sure you have Node.js 18+ installed:
+   ```bash
+   node --version  # Should show v18.0.0 or higher
+   ```
+
+---
 
 ## Overview
 
