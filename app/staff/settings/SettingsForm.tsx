@@ -3,17 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
-import { CreditUnionSettings, LoanProduct } from '@prisma/client';
+import { CreditUnionSettings, LoanProduct, ProductConfiguration } from '@prisma/client';
+import ProductConfigModal from './ProductConfigModal';
 
 interface SettingsFormProps {
   settings: CreditUnionSettings | null;
-  products: LoanProduct[];
+  products: (LoanProduct & { configuration?: ProductConfiguration | null })[];
 }
 
 export default function SettingsForm({ settings, products }: SettingsFormProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<(LoanProduct & { configuration?: ProductConfiguration | null }) | null>(null);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   
   const [generalSettings, setGeneralSettings] = useState({
     name: settings?.name || '',
@@ -27,6 +30,59 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
     maxUploadSize: settings?.maxUploadSize || 5242880,
     allowedFileTypes: settings?.allowedFileTypes || 'image/jpeg,image/png,application/pdf',
   });
+
+  // Parse JSON fields with defaults
+  const defaultAddressLabels = {
+    streetNumber: 'Street Number',
+    streetName: 'Street Name',
+    unit: 'Unit/Apt',
+    city: 'City',
+    province: 'Province',
+    postalCode: 'Postal Code',
+  };
+
+  const defaultDocuments = ['id_front', 'id_back', 'pay_stub'];
+  
+  const defaultFinancialInfo = {
+    bankAccountBalance: true,
+    investmentValue: false,
+    propertyValue: false,
+    vehicleValue: false,
+    creditCardBalances: true,
+    creditCardLimits: true,
+  };
+
+  const defaultConsents = {
+    creditCheck: true,
+    fintrac: true,
+    privacy: true,
+    terms: true,
+    esignature: true,
+  };
+
+  const [addressLabels, setAddressLabels] = useState(
+    settings?.addressFieldLabels ? JSON.parse(settings.addressFieldLabels) : defaultAddressLabels
+  );
+  
+  const [requiredDocuments, setRequiredDocuments] = useState<string[]>(
+    settings?.requiredDocuments ? JSON.parse(settings.requiredDocuments) : defaultDocuments
+  );
+  
+  const [requiredFinancialInfo, setRequiredFinancialInfo] = useState(
+    settings?.requiredFinancialInfo ? JSON.parse(settings.requiredFinancialInfo) : defaultFinancialInfo
+  );
+  
+  const [requiredConsents, setRequiredConsents] = useState(
+    settings?.requiredConsents ? JSON.parse(settings.requiredConsents) : defaultConsents
+  );
+  
+  const [termsOfService, setTermsOfService] = useState(
+    settings?.termsOfService || 'Enter your terms of service here...'
+  );
+
+  const [newDocumentType, setNewDocumentType] = useState('');
+  const [customDocumentName, setCustomDocumentName] = useState('');
+  const [isCustomDocument, setIsCustomDocument] = useState(false);
 
   const [emailTemplates, setEmailTemplates] = useState({
     approvalTemplate: settings?.approvalTemplate || '',
@@ -56,7 +112,15 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
       await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'flow', ...flowSettings }),
+        body: JSON.stringify({ 
+          type: 'flow', 
+          ...flowSettings,
+          addressFieldLabels: JSON.stringify(addressLabels),
+          requiredDocuments: JSON.stringify(requiredDocuments),
+          requiredFinancialInfo: JSON.stringify(requiredFinancialInfo),
+          requiredConsents: JSON.stringify(requiredConsents),
+          termsOfService,
+        }),
       });
       alert('Settings saved successfully');
     } catch (error) {
@@ -65,6 +129,58 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
       setLoading(false);
     }
   };
+
+  const addDocument = () => {
+    if (isCustomDocument && customDocumentName) {
+      // Add custom document
+      const customDoc = customDocumentName.toLowerCase().replace(/\s+/g, '_');
+      if (!requiredDocuments.includes(customDoc)) {
+        setRequiredDocuments([...requiredDocuments, customDoc]);
+        setCustomDocumentName('');
+        setIsCustomDocument(false);
+      }
+    } else if (newDocumentType && !requiredDocuments.includes(newDocumentType)) {
+      // Add predefined document
+      setRequiredDocuments([...requiredDocuments, newDocumentType]);
+      setNewDocumentType('');
+    }
+  };
+
+  const handleDocumentSelectChange = (value: string) => {
+    if (value === 'custom') {
+      setIsCustomDocument(true);
+      setNewDocumentType('');
+    } else {
+      setIsCustomDocument(false);
+      setNewDocumentType(value);
+      setCustomDocumentName('');
+    }
+  };
+
+  const formatDocumentLabel = (doc: string) => {
+    // Check if it's a predefined document
+    const predefined = documentTypeOptions.find(opt => opt.value === doc);
+    if (predefined) return predefined.label;
+    // Format custom document name
+    return doc.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const removeDocument = (doc: string) => {
+    setRequiredDocuments(requiredDocuments.filter(d => d !== doc));
+  };
+
+  const documentTypeOptions = [
+    { value: 'id_front', label: 'ID - Front' },
+    { value: 'id_back', label: 'ID - Back' },
+    { value: 'pay_stub', label: 'Pay Stub' },
+    { value: 'bank_statement', label: 'Bank Statement' },
+    { value: 'employment_letter', label: 'Employment Letter' },
+    { value: 'tax_return', label: 'Tax Return' },
+    { value: 'property_appraisal', label: 'Property Appraisal' },
+    { value: 'insurance_proof', label: 'Insurance Proof' },
+    { value: 'utility_bill', label: 'Utility Bill' },
+    { value: 'custom', label: '+ Create Custom Document Type...' },
+  ];
 
   const handleProductUpdate = async (productId: string, updates: Partial<LoanProduct>) => {
     setLoading(true);
@@ -80,6 +196,20 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProductConfigSave = async (productId: string, config: any) => {
+    await fetch(`/api/products/${productId}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    router.refresh();
+  };
+
+  const openProductConfig = (product: LoanProduct & { configuration?: ProductConfiguration | null }) => {
+    setSelectedProduct(product);
+    setIsConfigModalOpen(true);
   };
 
   const tabs = [
@@ -187,70 +317,214 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
 
         {/* Application Flow Settings */}
         {activeTab === 'flow' && (
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-6">Application Flow Settings</h2>
-            <div className="space-y-6">
-              <div>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={flowSettings.requireSin}
-                    onChange={(e) => setFlowSettings({ ...flowSettings, requireSin: e.target.checked })}
-                    className="mr-3"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Require Social Insurance Number
-                  </span>
-                </label>
-              </div>
+          <div className="space-y-6">
+            {/* Basic Settings */}
+            <div className="card">
+              <h2 className="text-xl font-semibold mb-6">Basic Flow Settings</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={flowSettings.requireSin}
+                      onChange={(e) => setFlowSettings({ ...flowSettings, requireSin: e.target.checked })}
+                      className="mr-3"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Require Social Insurance Number
+                    </span>
+                  </label>
+                </div>
 
-              <div>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={flowSettings.requireEmployment}
-                    onChange={(e) => setFlowSettings({ ...flowSettings, requireEmployment: e.target.checked })}
-                    className="mr-3"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Require Employment Information
-                  </span>
-                </label>
-              </div>
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={flowSettings.requireEmployment}
+                      onChange={(e) => setFlowSettings({ ...flowSettings, requireEmployment: e.target.checked })}
+                      className="mr-3"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Require Employment Information
+                    </span>
+                  </label>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Maximum Upload Size (bytes)
-                </label>
-                <input
-                  type="number"
-                  value={flowSettings.maxUploadSize}
-                  onChange={(e) => setFlowSettings({ ...flowSettings, maxUploadSize: parseInt(e.target.value) })}
-                  className="input"
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Maximum Upload Size (bytes)
+                    </label>
+                    <input
+                      type="number"
+                      value={flowSettings.maxUploadSize}
+                      onChange={(e) => setFlowSettings({ ...flowSettings, maxUploadSize: parseInt(e.target.value) })}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Allowed File Types
+                    </label>
+                    <input
+                      type="text"
+                      value={flowSettings.allowedFileTypes}
+                      onChange={(e) => setFlowSettings({ ...flowSettings, allowedFileTypes: e.target.value })}
+                      className="input"
+                      placeholder="image/jpeg,image/png,application/pdf"
+                    />
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Allowed File Types
-                </label>
-                <input
-                  type="text"
-                  value={flowSettings.allowedFileTypes}
-                  onChange={(e) => setFlowSettings({ ...flowSettings, allowedFileTypes: e.target.value })}
-                  className="input"
-                  placeholder="image/jpeg,image/png,application/pdf"
-                />
-              </div>
-
-              <button
-                onClick={handleSaveFlow}
-                disabled={loading}
-                className="btn-primary"
-              >
-                {loading ? 'Saving...' : 'Save Flow Settings'}
-              </button>
             </div>
+
+            {/* Address Field Labels */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">Address Field Labels</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(addressLabels).map(([key, value]) => (
+                  <div key={key}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </label>
+                    <input
+                      type="text"
+                      value={value as string}
+                      onChange={(e) => setAddressLabels({ ...addressLabels, [key]: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Required Documents */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">Required Documents</h3>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  {!isCustomDocument ? (
+                    <select
+                      value={newDocumentType}
+                      onChange={(e) => handleDocumentSelectChange(e.target.value)}
+                      className="input flex-1"
+                    >
+                      <option value="">Select document type...</option>
+                      {documentTypeOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={customDocumentName}
+                        onChange={(e) => setCustomDocumentName(e.target.value)}
+                        placeholder="Enter custom document name..."
+                        className="input flex-1"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsCustomDocument(false);
+                          setCustomDocumentName('');
+                        }}
+                        className="px-3 py-2 text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={addDocument}
+                    className="btn-primary"
+                    disabled={!isCustomDocument ? !newDocumentType : !customDocumentName.trim()}
+                  >
+                    {isCustomDocument ? 'Add Custom' : 'Add Document'}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {requiredDocuments.map(doc => (
+                    <div key={doc} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded">
+                      <span className="text-sm">
+                        {formatDocumentLabel(doc)}
+                      </span>
+                      <button
+                        onClick={() => removeDocument(doc)}
+                        className="text-red-600 hover:text-red-700 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {requiredDocuments.length === 0 && (
+                    <p className="text-gray-500 text-sm italic">No documents required</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Requirements */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">Required Financial Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(requiredFinancialInfo).map(([key, value]) => (
+                  <label key={key} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={value as boolean}
+                      onChange={(e) => setRequiredFinancialInfo({ ...requiredFinancialInfo, [key]: e.target.checked })}
+                      className="mr-3"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Consents Configuration */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">Required Consents</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(requiredConsents).map(([key, value]) => (
+                  <label key={key} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={value as boolean}
+                      onChange={(e) => setRequiredConsents({ ...requiredConsents, [key]: e.target.checked })}
+                      className="mr-3"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {key === 'fintrac' ? 'FINTRAC' : 
+                       key === 'esignature' ? 'E-Signature' :
+                       key.charAt(0).toUpperCase() + key.slice(1)} Consent
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Terms of Service */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">Terms of Service</h3>
+              <textarea
+                value={termsOfService}
+                onChange={(e) => setTermsOfService(e.target.value)}
+                className="input min-h-[200px] font-mono text-sm"
+                placeholder="Enter your terms of service text here..."
+              />
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveFlow}
+              disabled={loading}
+              className="btn-primary"
+            >
+              {loading ? 'Saving...' : 'Save All Flow Settings'}
+            </button>
           </div>
         )}
 
@@ -310,7 +584,10 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
                     >
                       {product.isActive ? 'Deactivate' : 'Activate'}
                     </button>
-                    <button className="text-primary-600 hover:text-primary-700 px-4 py-2">
+                    <button 
+                      onClick={() => openProductConfig(product)}
+                      className="text-primary-600 hover:text-primary-700 px-4 py-2"
+                    >
                       Edit
                     </button>
                   </div>
@@ -414,6 +691,19 @@ export default function SettingsForm({ settings, products }: SettingsFormProps) 
           </div>
         )}
       </div>
+
+      {/* Product Configuration Modal */}
+      {selectedProduct && (
+        <ProductConfigModal
+          product={selectedProduct}
+          isOpen={isConfigModalOpen}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          onSave={handleProductConfigSave}
+        />
+      )}
     </div>
   );
 }

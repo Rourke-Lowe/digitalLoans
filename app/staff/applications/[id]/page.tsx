@@ -3,15 +3,17 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import ReviewInterface from './ReviewInterface';
 
-export default async function ReviewPage({ params }: { params: { id: string } }) {
+export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
 
   if (!user || user.role === 'member') {
     redirect('/');
   }
 
+  const { id } = await params;
+
   const application = await prisma.loanApplication.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       user: true,
       product: true,

@@ -12,6 +12,9 @@ export default async function SettingsPage() {
 
   const settings = await prisma.creditUnionSettings.findFirst();
   const products = await prisma.loanProduct.findMany({
+    include: {
+      configuration: true,
+    },
     orderBy: { name: 'asc' },
   });
 

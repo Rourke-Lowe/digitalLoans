@@ -3,15 +3,17 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Header from '@/components/ui/Header';
 
-export default async function ApplicationViewPage({ params }: { params: { id: string } }) {
+export default async function ApplicationViewPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
 
   if (!user || user.role !== 'member') {
     redirect('/');
   }
 
+  const { id } = await params;
+
   const application = await prisma.loanApplication.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       product: true,
       reviews: {

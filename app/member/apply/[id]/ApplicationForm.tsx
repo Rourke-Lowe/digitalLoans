@@ -3,13 +3,45 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
-import { LoanApplication, LoanProduct } from '@prisma/client';
+import { LoanApplication, LoanProduct, ProductConfiguration, CreditUnionSettings } from '@prisma/client';
 
 interface ApplicationFormProps {
-  application: LoanApplication & { product: LoanProduct };
+  application: LoanApplication & { 
+    product: LoanProduct & { 
+      configuration: ProductConfiguration | null;
+    };
+  };
+  settings: CreditUnionSettings | null;
 }
 
-export default function ApplicationForm({ application }: ApplicationFormProps) {
+export default function ApplicationForm({ application, settings }: ApplicationFormProps) {
+  // Parse settings
+  const addressLabels = settings?.addressFieldLabels ? JSON.parse(settings.addressFieldLabels) : {
+    streetNumber: 'Street Number',
+    streetName: 'Street Name',
+    unit: 'Unit/Apt',
+    city: 'City',
+    province: 'Province',
+    postalCode: 'Postal Code',
+  };
+  
+  const requiredDocuments = settings?.requiredDocuments ? JSON.parse(settings.requiredDocuments) : ['id_front', 'id_back', 'pay_stub'];
+  const requiredFinancialInfo = settings?.requiredFinancialInfo ? JSON.parse(settings.requiredFinancialInfo) : {};
+  const requiredConsents = settings?.requiredConsents ? JSON.parse(settings.requiredConsents) : {
+    creditCheck: true,
+    fintrac: true,
+    privacy: true,
+    terms: true,
+    esignature: true,
+  };
+  
+  // Parse product configuration
+  const productConfig = application.product.configuration;
+  const additionalDocs = productConfig?.additionalDocuments ? JSON.parse(productConfig.additionalDocuments) : [];
+  const additionalFinancial = productConfig?.additionalFinancialFields ? JSON.parse(productConfig.additionalFinancialFields) : {};
+  
+  // Combine required documents
+  const allRequiredDocuments = [...requiredDocuments, ...additionalDocs];
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(application.currentStep || 1);
   const [loading, setLoading] = useState(false);
@@ -50,9 +82,38 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
     monthlyHousingCost: '',
     otherMonthlyDebts: '',
     numberOfDependents: '',
+    // Assets
+    bankAccountBalance: '',
+    investmentValue: '',
+    propertyValue: '',
+    vehicleValue: '',
+    otherAssetsValue: '',
+    otherAssetsDesc: '',
+    // Liabilities
+    creditCardBalances: '',
+    creditCardLimits: '',
+    existingLoans: [],
+    // Banking
+    primaryBank: '',
+    bankingYears: '',
+    accountType: '',
   });
 
   const [showPreviousAddress, setShowPreviousAddress] = useState(false);
+  
+  // Consent state management
+  const [consents, setConsents] = useState({
+    creditCheck: false,
+    fintrac: false,
+    privacy: false,
+    terms: false,
+    esignature: false,
+  });
+  
+  // Check if all mandatory consents are checked
+  const mandatoryConsentsChecked = Object.entries(requiredConsents)
+    .filter(([_, required]) => required)
+    .every(([key, _]) => consents[key as keyof typeof consents]);
 
   const steps = [
     { number: 1, title: 'Loan Details', completed: true },
@@ -75,6 +136,14 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
           ...formData,
           annualIncome: formData.annualIncome ? parseFloat(formData.annualIncome) : null,
           monthlyIncome: formData.annualIncome ? parseFloat(formData.annualIncome) / 12 : null,
+          bankAccountBalance: formData.bankAccountBalance ? parseFloat(formData.bankAccountBalance) : null,
+          investmentValue: formData.investmentValue ? parseFloat(formData.investmentValue) : null,
+          propertyValue: formData.propertyValue ? parseFloat(formData.propertyValue) : null,
+          vehicleValue: formData.vehicleValue ? parseFloat(formData.vehicleValue) : null,
+          otherAssetsValue: formData.otherAssetsValue ? parseFloat(formData.otherAssetsValue) : null,
+          creditCardBalances: formData.creditCardBalances ? parseFloat(formData.creditCardBalances) : null,
+          creditCardLimits: formData.creditCardLimits ? parseFloat(formData.creditCardLimits) : null,
+          existingLoans: JSON.stringify(formData.existingLoans),
           currentStep,
         }),
       });
@@ -391,7 +460,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Street Number
+                      {addressLabels.streetNumber}
                     </label>
                     <input
                       type="text"
@@ -403,7 +472,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                   </div>
                   <div className="col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Street Name
+                      {addressLabels.streetName}
                     </label>
                     <input
                       type="text"
@@ -417,7 +486,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Unit/Apartment (Optional)
+                    {addressLabels.unit} (Optional)
                   </label>
                   <input
                     type="text"
@@ -431,7 +500,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City
+                      {addressLabels.city}
                     </label>
                     <input
                       type="text"
@@ -443,7 +512,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Province/Territory
+                      {addressLabels.province}
                     </label>
                     <select
                       value={formData.province}
@@ -471,7 +540,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Postal Code
+                    {addressLabels.postalCode}
                   </label>
                   <input
                     type="text"
@@ -716,9 +785,96 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                   </div>
                 </div>
 
-                {/* Monthly Obligations Section */}
+                {/* Assets & Collateral Section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Monthly Obligations</h3>
+                  <h3 className="text-lg font-semibold mb-4">Assets & Collateral</h3>
+                  <p className="text-sm text-gray-600 mb-4">This information helps us assess your overall financial position</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Bank Account Balance
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.bankAccountBalance}
+                          onChange={(e) => setFormData({ ...formData, bankAccountBalance: e.target.value })}
+                          placeholder="10000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Checking & savings</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Investment Accounts
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.investmentValue}
+                          onChange={(e) => setFormData({ ...formData, investmentValue: e.target.value })}
+                          placeholder="25000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Stocks, bonds, TFSA, RRSP</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Real Estate Value
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.propertyValue}
+                          onChange={(e) => setFormData({ ...formData, propertyValue: e.target.value })}
+                          placeholder="500000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Current market value</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vehicle Value
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.vehicleValue}
+                          onChange={(e) => setFormData({ ...formData, vehicleValue: e.target.value })}
+                          placeholder="15000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">All vehicles owned</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Other Assets (Optional)
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="number"
+                          value={formData.otherAssetsValue}
+                          onChange={(e) => setFormData({ ...formData, otherAssetsValue: e.target.value })}
+                          placeholder="5000"
+                          className="input"
+                        />
+                        <input
+                          type="text"
+                          value={formData.otherAssetsDesc}
+                          onChange={(e) => setFormData({ ...formData, otherAssetsDesc: e.target.value })}
+                          placeholder="Description (e.g., jewelry, art)"
+                          className="input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Liabilities Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Liabilities & Monthly Obligations</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -735,6 +891,35 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                       <p className="text-sm text-gray-500 mt-1">Rent or mortgage payment</p>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Credit Card Balances
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.creditCardBalances}
+                          onChange={(e) => setFormData({ ...formData, creditCardBalances: e.target.value })}
+                          placeholder="2000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Total across all cards</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Credit Card Limits
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.creditCardLimits}
+                          onChange={(e) => setFormData({ ...formData, creditCardLimits: e.target.value })}
+                          placeholder="10000"
+                          className="input"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Total available credit</p>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Other Monthly Debts
@@ -747,7 +932,7 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                         className="input"
                         required
                       />
-                      <p className="text-sm text-gray-500 mt-1">Car payments, credit cards, other loans</p>
+                      <p className="text-sm text-gray-500 mt-1">Car payments, student loans, other loans</p>
                     </div>
 
                     <div>
@@ -768,17 +953,79 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                   </div>
                 </div>
 
-                {/* Debt Service Ratio Calculation (for display only) */}
+                {/* Banking Relationship Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Banking Relationship</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Primary Banking Institution
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.primaryBank}
+                        onChange={(e) => setFormData({ ...formData, primaryBank: e.target.value })}
+                        placeholder="e.g., TD Bank, RBC"
+                        className="input"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Years with Bank
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.bankingYears}
+                          onChange={(e) => setFormData({ ...formData, bankingYears: e.target.value })}
+                          placeholder="5"
+                          className="input"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Account Type
+                        </label>
+                        <select
+                          value={formData.accountType}
+                          onChange={(e) => setFormData({ ...formData, accountType: e.target.value })}
+                          className="input"
+                        >
+                          <option value="">Select type</option>
+                          <option value="Checking">Checking</option>
+                          <option value="Savings">Savings</option>
+                          <option value="Both">Both</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Enhanced Debt Service Ratio Calculation */}
                 {formData.annualIncome && formData.monthlyHousingCost && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-900 mb-2">Debt Service Ratios</h4>
-                    <div className="text-sm text-blue-800">
+                    <h4 className="font-semibold text-blue-900 mb-2">Financial Summary</h4>
+                    <div className="text-sm text-blue-800 space-y-2">
+                      <p>Monthly Income: ${(parseFloat(formData.annualIncome) / 12).toFixed(0)}</p>
+                      <p>Total Assets: ${(
+                        parseFloat(formData.bankAccountBalance || '0') +
+                        parseFloat(formData.investmentValue || '0') +
+                        parseFloat(formData.propertyValue || '0') +
+                        parseFloat(formData.vehicleValue || '0') +
+                        parseFloat(formData.otherAssetsValue || '0')
+                      ).toLocaleString()}</p>
                       <p>Gross Debt Service (GDS): {
                         ((parseFloat(formData.monthlyHousingCost) / (parseFloat(formData.annualIncome) / 12)) * 100).toFixed(1)
                       }%</p>
-                      <p className="mt-1">Total Debt Service (TDS): {
+                      <p>Total Debt Service (TDS): {
                         (((parseFloat(formData.monthlyHousingCost) + parseFloat(formData.otherMonthlyDebts || '0')) / (parseFloat(formData.annualIncome) / 12)) * 100).toFixed(1)
                       }%</p>
+                      {formData.creditCardLimits && formData.creditCardBalances && (
+                        <p>Credit Utilization: {
+                          ((parseFloat(formData.creditCardBalances) / parseFloat(formData.creditCardLimits)) * 100).toFixed(1)
+                        }%</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -983,14 +1230,30 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
 
                 {/* Consents Section */}
                 <div className="border-t pt-6">
-                  <h3 className="font-semibold text-lg mb-4">Required Consents</h3>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold text-lg">Required Consents</h3>
+                    <button
+                      type="button"
+                      onClick={() => setConsents({
+                        creditCheck: true,
+                        fintrac: true,
+                        privacy: true,
+                        terms: true,
+                        esignature: true,
+                      })}
+                      className="text-sm bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700"
+                    >
+                      Consent to All
+                    </button>
+                  </div>
                   <div className="space-y-4">
                     <div className="flex items-start">
                       <input
                         type="checkbox"
                         id="credit_check"
+                        checked={consents.creditCheck}
+                        onChange={(e) => setConsents({ ...consents, creditCheck: e.target.checked })}
                         className="mt-1 mr-3"
-                        required
                       />
                       <label htmlFor="credit_check" className="text-sm text-gray-700">
                         <span className="font-medium">Credit Bureau Authorization:</span> I authorize the credit union to obtain credit reports from Equifax and/or TransUnion to assess my creditworthiness for this loan application.
@@ -1001,8 +1264,9 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                       <input
                         type="checkbox"
                         id="fintrac"
+                        checked={consents.fintrac}
+                        onChange={(e) => setConsents({ ...consents, fintrac: e.target.checked })}
                         className="mt-1 mr-3"
-                        required
                       />
                       <label htmlFor="fintrac" className="text-sm text-gray-700">
                         <span className="font-medium">FINTRAC Identity Verification:</span> I consent to the verification of my identity as required under Canadian anti-money laundering regulations.
@@ -1013,8 +1277,9 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                       <input
                         type="checkbox"
                         id="privacy"
+                        checked={consents.privacy}
+                        onChange={(e) => setConsents({ ...consents, privacy: e.target.checked })}
                         className="mt-1 mr-3"
-                        required
                       />
                       <label htmlFor="privacy" className="text-sm text-gray-700">
                         <span className="font-medium">Privacy Policy:</span> I have read and agree to the credit union's privacy policy regarding the collection, use, and disclosure of my personal information.
@@ -1025,11 +1290,12 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                       <input
                         type="checkbox"
                         id="terms"
+                        checked={consents.terms}
+                        onChange={(e) => setConsents({ ...consents, terms: e.target.checked })}
                         className="mt-1 mr-3"
-                        required
                       />
                       <label htmlFor="terms" className="text-sm text-gray-700">
-                        <span className="font-medium">Terms of Service:</span> I agree to the terms and conditions of the loan application and understand the obligations if my application is approved.
+                        <span className="font-medium">Terms of Service <span className="text-red-500">*</span>:</span> I agree to the terms and conditions of the loan application and understand the obligations if my application is approved.
                       </label>
                     </div>
 
@@ -1037,14 +1303,21 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
                       <input
                         type="checkbox"
                         id="esignature"
+                        checked={consents.esignature}
+                        onChange={(e) => setConsents({ ...consents, esignature: e.target.checked })}
                         className="mt-1 mr-3"
-                        required
                       />
                       <label htmlFor="esignature" className="text-sm text-gray-700">
-                        <span className="font-medium">Electronic Signature Consent:</span> I consent to using electronic signatures for this application and understand they are legally binding.
+                        <span className="font-medium">Electronic Signature Consent <span className="text-red-500">*</span>:</span> I consent to using electronic signatures for this application and understand they are legally binding.
                       </label>
                     </div>
                   </div>
+                  
+                  {!mandatoryConsentsChecked && (
+                    <p className="text-sm text-red-600 mt-4">
+                      * Mandatory consents must be checked to continue
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1067,8 +1340,8 @@ export default function ApplicationForm({ application }: ApplicationFormProps) {
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={loading}
-                className="btn-primary ml-auto"
+                disabled={loading || !mandatoryConsentsChecked}
+                className={`btn-primary ml-auto ${!mandatoryConsentsChecked ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {loading ? 'Submitting...' : 'Submit Application'}
               </button>

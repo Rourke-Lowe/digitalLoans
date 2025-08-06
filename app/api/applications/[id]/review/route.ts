@@ -3,15 +3,16 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { decision, notes, reviewerId } = await request.json();
 
     // Create review record
     const review = await prisma.applicationReview.create({
       data: {
-        applicationId: params.id,
+        applicationId: id,
         reviewerId,
         decision,
         notes,
@@ -26,7 +27,7 @@ export async function POST(
     };
 
     await prisma.loanApplication.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: statusMap[decision as keyof typeof statusMap],
       },
@@ -35,7 +36,7 @@ export async function POST(
     // Log activity
     await prisma.applicationActivity.create({
       data: {
-        applicationId: params.id,
+        applicationId: id,
         userId: reviewerId,
         action: `decision_${decision}`,
         details: notes,

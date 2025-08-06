@@ -14,12 +14,20 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
 
   const application = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { product: true },
+    include: { 
+      product: {
+        include: {
+          configuration: true,
+        },
+      },
+    },
   });
 
   if (!application || application.userId !== user.id) {
     redirect('/member');
   }
 
-  return <ApplicationForm application={application} />;
+  const settings = await prisma.creditUnionSettings.findFirst();
+
+  return <ApplicationForm application={application} settings={settings} />;
 }

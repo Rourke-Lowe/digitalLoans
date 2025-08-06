@@ -41,6 +41,7 @@ model LoanProduct {
   updatedAt       DateTime  @updatedAt
   
   applications    LoanApplication[]
+  configuration   ProductConfiguration?
 }
 
 model LoanApplication {
@@ -96,6 +97,24 @@ model LoanApplication {
   monthlyHousingCost  String?
   otherMonthlyDebts   String?
   numberOfDependents  String?
+  
+  // Assets
+  bankAccountBalance  Float?
+  investmentValue     Float?
+  propertyValue       Float?
+  vehicleValue        Float?
+  otherAssetsValue    Float?
+  otherAssetsDesc     String?
+  
+  // Liabilities
+  creditCardBalances  Float?
+  creditCardLimits    Float?
+  existingLoans       String?    // JSON array of loan details
+  
+  // Banking
+  primaryBank         String?
+  bankingYears        String?
+  accountType         String?
   
   // Status
   status              String      @default("draft") // draft, submitted, under_review, approved, denied, withdrawn
@@ -162,6 +181,21 @@ model CreditUnionSettings {
   maxUploadSize     Int       @default(5242880) // 5MB
   allowedFileTypes  String    @default("image/jpeg,image/png,application/pdf")
   
+  // Field Labels Configuration (JSON)
+  addressFieldLabels    String?   // JSON: { streetNumber: "Street Number", streetName: "Street Name", etc. }
+  
+  // Required Documents Configuration (JSON)
+  requiredDocuments     String?   // JSON: ["id_front", "id_back", "pay_stub", etc.]
+  
+  // Financial Requirements (JSON)
+  requiredFinancialInfo String?   // JSON: { bankAccountBalance: true, investmentValue: false, etc. }
+  
+  // Consents Configuration (JSON)
+  requiredConsents      String?   // JSON: { creditCheck: true, fintrac: true, privacy: false, etc. }
+  
+  // Terms of Service
+  termsOfService        String?   // The actual terms text
+  
   // Email templates
   approvalTemplate  String?
   denialTemplate    String?
@@ -169,4 +203,23 @@ model CreditUnionSettings {
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+model ProductConfiguration {
+  id                    String    @id @default(cuid())
+  productId             String    @unique
+  
+  // Additional documents required for this product (JSON)
+  additionalDocuments   String?   // JSON: ["property_appraisal", "insurance_proof", etc.]
+  
+  // Additional financial fields required (JSON)
+  additionalFinancialFields String? // JSON: { propertyTaxes: true, homeInsurance: true, etc. }
+  
+  // Field overrides specific to this product (JSON)
+  fieldOverrides        String?   // JSON: { minIncome: 50000, maxDebtRatio: 0.4, etc. }
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  product               LoanProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
