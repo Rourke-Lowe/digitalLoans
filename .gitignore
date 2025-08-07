@@ -40,6 +40,10 @@ next-env.d.ts
 # Prisma
 /generated/prisma
 prisma/migrations/dev/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # Logs
 logs/
