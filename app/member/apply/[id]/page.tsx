@@ -29,5 +29,5 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
 
   const settings = await prisma.creditUnionSettings.findFirst();
 
-  return <ApplicationForm application={application} settings={settings} />;
+  return <ApplicationForm application={application} settings={settings} user={user} />;
 }

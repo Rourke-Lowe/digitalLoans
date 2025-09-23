@@ -70,6 +70,8 @@ export default function LoginPage() {
         <div className="mt-6 text-sm text-gray-600">
           <p className="font-semibold mb-2">Test Accounts:</p>
           <ul className="space-y-1">
+            <li className="text-green-600 font-medium">• new.member@email.com (New Member - No Profile)</li>
+            <li className="text-blue-600 font-medium">• existing.member@email.com (Existing Member - Has Profile)</li>
             <li>• john.doe@email.com (Member)</li>
             <li>• jane.smith@email.com (Member)</li>
             <li>• sarah.martin@email.com (Member)</li>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Member Flow Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Digital Loans - Member Flow Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Login as New Member</h2>
+        <button onclick="testNewMember()">Run Test</button>
+        <div id="newMemberResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Login as Existing Member</h2>
+        <button onclick="testExistingMember()">Run Test</button>
+        <div id="existingMemberResult"></div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:3001';
+        
+        async function testNewMember() {
+            const resultDiv = document.getElementById('newMemberResult');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Login
+                const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'new.member@email.com' }),
+                    credentials: 'include'
+                });
+                
+                if (!loginRes.ok) throw new Error('Login failed');
+                
+                resultDiv.innerHTML = `
+                    <p class="success">✓ Login successful</p>
+                    <p>Expected behavior:</p>
+                    <ul>
+                        <li>No Profile tab should appear</li>
+                        <li>All form fields should be empty</li>
+                        <li>No "Updated" indicators</li>
+                    </ul>
+                    <p><a href="${API_URL}/member/apply/test-app-new" target="_blank">Open Application →</a></p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ ${error.message}</p>`;
+            }
+        }
+        
+        async function testExistingMember() {
+            const resultDiv = document.getElementById('existingMemberResult');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Login
+                const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'existing.member@email.com' }),
+                    credentials: 'include'
+                });
+                
+                if (!loginRes.ok) throw new Error('Login failed');
+                
+                resultDiv.innerHTML = `
+                    <p class="success">✓ Login successful as Robert Johnson</p>
+                    <p>Expected behavior:</p>
+                    <ul>
+                        <li>Profile tab should appear with "From Universa" badge</li>
+                        <li>Form fields should be pre-populated with:</li>
+                        <ul>
+                            <li>Name: Robert Johnson</li>
+                            <li>Phone: (416) 555-0123</li>
+                            <li>Address: 789 King Street, Suite 400</li>
+                            <li>Employer: Tech Solutions Inc</li>
+                            <li>Income: $95,000</li>
+                        </ul>
+                        <li>Changed fields should show yellow highlight</li>
+                        <li>Review page should show comparison</li>
+                    </ul>
+                    <p><a href="${API_URL}/member/apply/test-app-existing" target="_blank">Open Application →</a></p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

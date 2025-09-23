@@ -26,6 +26,21 @@ async function main() {
         role: 'member',
       },
     }),
+    // New test users for member types
+    prisma.user.create({
+      data: {
+        email: 'new.member@email.com',
+        name: 'New Member',
+        role: 'member',
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'existing.member@email.com',
+        name: 'Robert Johnson',
+        role: 'member',
+      },
+    }),
     // Staff
     prisma.user.create({
       data: {

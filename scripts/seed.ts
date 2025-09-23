@@ -55,6 +55,27 @@ async function main() {
       role: 'member',
     },
   });
+  
+  // New test users for member types
+  await prisma.user.upsert({
+    where: { email: 'new.member@email.com' },
+    update: {},
+    create: {
+      email: 'new.member@email.com',
+      name: 'New Member',
+      role: 'member',
+    },
+  });
+  
+  await prisma.user.upsert({
+    where: { email: 'existing.member@email.com' },
+    update: {},
+    create: {
+      email: 'existing.member@email.com',
+      name: 'Robert Johnson',
+      role: 'member',
+    },
+  });
 
   // Create credit union settings
   await prisma.creditUnionSettings.upsert({

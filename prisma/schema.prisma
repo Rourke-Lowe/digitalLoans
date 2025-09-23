@@ -121,6 +121,10 @@ model LoanApplication {
   currentStep         Int         @default(1)
   submittedAt         DateTime?
   
+  // Universa tracking for existing members
+  universaData        String?     // JSON of original Universa data
+  changedFields       String?     // JSON array of field names that were changed
+  
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   
