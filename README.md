@@ -1,8 +1,20 @@
-# Digital Loans Application Platform
+# Digital Loans Application Platform - UI/UX Prototype
 
-## 🚀 QUICK START - LOCAL SETUP INSTRUCTIONS
+A comprehensive loan application workflow demonstration platform designed to showcase credit union loan processing capabilities and gather stakeholder requirements.
 
-### ⚠️ IMPORTANT: Follow these steps to run the application locally
+## 🎯 Purpose
+
+This is a **UI/UX prototype** that demonstrates the complete loan application lifecycle from initial submission through disbursement. It's designed for requirements gathering and stakeholder demonstrations, not production use.
+
+## 🚀 Quick Start - Local Setup
+
+### Prerequisites
+
+- **Node.js 18.0 or higher** (check with `node --version`)
+- **npm** (comes with Node.js)
+- **Git**
+
+### Installation Steps
 
 1. **Clone the repository:**
    ```bash
@@ -15,15 +27,16 @@
    npm install
    ```
 
-3. **Create the environment file:**
+3. **Set up environment file:**
    ```bash
-   echo "DATABASE_URL=\"file:./dev.db\"" > .env
+   echo 'DATABASE_URL="file:./dev.db"' > .env
    ```
 
-4. **Initialize the database:**
+4. **Initialize and migrate the database:**
    ```bash
-   npx prisma db push
+   npx prisma migrate dev
    ```
+   When prompted for a migration name, just press Enter to accept the default.
 
 5. **Seed the database with test data:**
    ```bash
@@ -35,364 +48,183 @@
    npm run dev
    ```
 
-7. **Open your browser and navigate to:**
+7. **Open your browser:**
    ```
    http://localhost:3000
    ```
+   Note: If port 3000 is busy, the app will use 3001 or 3002 automatically.
 
-### 📝 TEST ACCOUNTS
+## 📝 Test Accounts
 
-Use these test accounts to login and explore the application:
+**Important:** This prototype uses email-only authentication (no passwords) for testing convenience.
 
-**Admin Account:**
-- Email: `admin@creditunion.com`
-- Role: Admin (full access)
+### Admin Account (Full Access)
+- **Email:** `admin@creditunion.com`
+- **Access:** All features, settings, and administrative controls
 
-**Staff Account:**
-- Email: `staff@creditunion.com`
-- Role: Staff (can review applications)
+### Staff Account (Review Applications)
+- **Email:** `staff@creditunion.com`
+- **Access:** Review applications, make decisions, manage workflow
 
-**Member Accounts:**
-- `john.doe@email.com` (Member)
-- `jane.smith@email.com` (Member)
-- `sarah.martin@email.com` (Member)
+### Member Accounts (Submit Applications)
+- `john.doe@email.com` - Sample member
+- `jane.smith@email.com` - Sample member
+- `sarah.martin@email.com` - Sample member
+- `new.member@email.com` - New member (no existing data)
+- `existing.member@email.com` - Existing member (has profile data)
 
-**Note:** This application uses email-only authentication (no passwords required for testing).
+## 🔄 Loan Status Workflow
 
-### ⚠️ TROUBLESHOOTING
+The prototype demonstrates a comprehensive 12-stage loan processing workflow:
 
-If you encounter any issues:
+1. **SCREENING** - Initial eligibility check
+2. **UNDERWRITING** - Credit analysis
+3. **DECISION_PENDING** - Awaiting approval
+4. **APPROVED** / **REJECTED** - Decision states
+5. **DOCUMENT_PREPARATION** - Generate documents
+6. **AWAITING_SIGNATURES** - Sent to borrower
+7. **SIGNED** - Documents received
+8. **RELEASING** - Final checks
+9. **DISBURSED** - Funds transferred
+10. **COMPLETED** - Process complete
+11. **TO_LOS** - Routed to Loan Origination System (for complex cases)
 
-1. **Port already in use:** The app runs on port 3000 by default. If this port is busy, it will automatically use port 3001 or 3002.
+## 🎮 Key Features to Test
 
-2. **Database issues:** If you need to reset the database:
-   ```bash
-   rm prisma/dev.db
-   npx prisma db push
-   npm run seed
-   ```
+### As a Member:
+1. **Start a loan application** - Click "Apply Now"
+2. **Complete the multi-step form** - Personal, employment, and financial info
+3. **Upload documents** - ID, pay stubs, etc.
+4. **Track application status** - View progress timeline
+5. **Review action items** - See what's needed from you
 
-3. **Build errors:** Make sure you have Node.js 18+ installed:
-   ```bash
-   node --version  # Should show v18.0.0 or higher
-   ```
+### As Staff/Admin:
+1. **Review applications** - Access the dashboard
+2. **Change application status** - Use the status dropdown
+3. **Add notes and decisions** - Document your review
+4. **Route to LOS** - For complex cases
+5. **Manage documents** - View uploaded files
+6. **Configure settings** (Admin only) - Customize requirements
+
+## 🛠 Troubleshooting
+
+### Database Issues
+
+If you encounter database errors, reset and rebuild:
+```bash
+rm prisma/dev.db
+rm -rf prisma/migrations
+npx prisma migrate dev --name init
+npm run seed
+```
+
+### Port Already in Use
+
+The app will automatically try ports 3000, 3001, 3002. Check the console output for the actual port being used.
+
+### Missing Dependencies
+
+If you see module errors:
+```bash
+rm -rf node_modules
+rm package-lock.json
+npm install
+```
+
+### Build Errors
+
+Ensure you have the correct Node.js version:
+```bash
+node --version  # Should be v18.0.0 or higher
+```
+
+If needed, use [nvm](https://github.com/nvm-sh/nvm) to install Node.js 18+:
+```bash
+nvm install 18
+nvm use 18
+```
+
+## 📁 Project Structure
+
+```
+digitalLoans/
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes
+│   ├── member/            # Member portal pages
+│   ├── staff/             # Staff dashboard pages
+│   └── page.tsx           # Landing page
+├── components/            # React components
+├── lib/                   # Utility functions
+├── prisma/               # Database schema and migrations
+├── public/               # Static assets
+└── scripts/              # Setup scripts
+```
+
+## 🔍 What This Prototype Demonstrates
+
+### ✅ Fully Implemented:
+- Complete loan application workflow
+- Multi-role authentication (Member/Staff/Admin)
+- Document upload and management
+- Status tracking and history
+- Application review interface
+- Activity audit trails
+- Administrative settings
+
+### 🎭 UI Mockups (Not Functional):
+- Credit bureau integration interface
+- eSignature workflow (DocuSign)
+- Email notifications
+- Payment processing
+- Third-party integrations
+
+For a complete feature list, see [featureList.md](featureList.md)
+
+## 🚀 Development Commands
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Reset database
+rm prisma/dev.db && npx prisma migrate dev && npm run seed
+
+# View database
+npx prisma studio
+```
+
+## 📊 Technology Stack
+
+- **Framework:** Next.js 15.4 with TypeScript
+- **Database:** SQLite with Prisma ORM
+- **Styling:** Tailwind CSS
+- **Authentication:** Session-based (simplified for prototype)
+
+## 🤝 Contributing
+
+This is a prototype project for demonstration purposes. For questions or issues:
+
+1. Check the [Issues](https://github.com/Rourke-Lowe/digitalLoans/issues) page
+2. Review [featureList.md](featureList.md) for implementation status
+3. Contact the development team
+
+## 📜 License
+
+This project is a proprietary prototype. All rights reserved.
+
+## 🔗 Additional Resources
+
+- [Feature List](featureList.md) - Complete feature implementation status
+- [Requirements Document](LOAN_STATUS_WORKFLOW_REQUIREMENTS.md) - Detailed workflow specifications
+- [Prisma Documentation](https://www.prisma.io/docs) - Database ORM reference
+- [Next.js Documentation](https://nextjs.org/docs) - Framework reference
 
 ---
 
-## Overview
-
-Based on the Adobe XD prototypes, this platform consists of two main components:
-
-1. **Member Application Portal** - A user-friendly interface for members to apply for loans
-2. **Credit Union Review Dashboard** - An administrative interface for credit union staff to review and process loan applications
-
-## Architecture Overview
-
-### Technology Stack
-- **Frontend**: React.js with TypeScript
-- **Backend**: Node.js with Express
-- **Database**: PostgreSQL
-- **Authentication**: JWT with refresh tokens
-- **File Storage**: AWS S3 or local storage
-- **Identity Verification**: Third-party integration (TBD)
-
-### System Components
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Member Application Flow                  │
-├─────────────────────────────────────────────────────────────┤
-│  1. Registration & Authentication                           │
-│  2. Personal Information Collection                         │
-│  3. Identity Verification & Document Upload                 │
-│  4. Account Selection & Review                             │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      API Gateway                            │
-│  - Authentication Middleware                                │
-│  - Request Validation                                       │
-│  - Rate Limiting                                           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Credit Union Review Dashboard               │
-├─────────────────────────────────────────────────────────────┤
-│  - Application Queue Management                             │
-│  - Document Review Interface                                │
-│  - Decision Making Tools                                    │
-│  - Communication with Applicants                           │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Member Application Flow
-
-### Step 1: Create Account & Verify Email
-- Email registration
-- Password creation with strength requirements
-- Email verification via OTP or link
-- Session management
-
-### Step 2: Tell Us About Yourself
-- Personal information collection
-  - Full name
-  - Date of birth
-  - Social Security Number (encrypted)
-  - Contact information
-- Employment information
-  - Employer name
-  - Employment status
-  - Income details
-  - Employment duration
-
-### Step 3: Identity Verification
-- Photo ID upload (driver's license, passport)
-- Selfie capture for biometric verification
-- Document upload functionality
-  - Pay stubs
-  - Tax returns
-  - Bank statements
-- Real-time verification status
-
-### Step 4: Choose Account Type
-- Display available loan products
-- Product comparison tool
-- Terms and conditions review
-- Electronic signature capture
-
-## Credit Union Review Dashboard
-
-### Core Features
-
-1. **Application Queue**
-   - Sortable/filterable list of pending applications
-   - Priority indicators
-   - Status tracking
-   - Bulk actions support
-
-2. **Application Review Interface**
-   - Comprehensive applicant profile view
-   - Document viewer with zoom/rotate capabilities
-   - Identity verification results
-   - Credit check integration
-   - Decision history log
-
-3. **Communication Tools**
-   - In-app messaging with applicants
-   - Email notifications
-   - Request additional documents
-   - Status update notifications
-
-4. **Decision Management**
-   - Approve/Deny/Request more info actions
-   - Conditional approval options
-   - Counter-offer capabilities
-   - Automated decision rules engine
-
-## Database Schema
-
-### Core Tables
-
-```sql
--- Users table for both members and credit union staff
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role ENUM('member', 'staff', 'admin') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Member profiles
-CREATE TABLE member_profiles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id),
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    date_of_birth DATE,
-    ssn_encrypted VARCHAR(255),
-    phone VARCHAR(20),
-    address JSONB,
-    employment_info JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Loan applications
-CREATE TABLE loan_applications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    member_id UUID REFERENCES member_profiles(id),
-    application_number VARCHAR(20) UNIQUE,
-    loan_type VARCHAR(50),
-    requested_amount DECIMAL(10, 2),
-    status ENUM('draft', 'submitted', 'under_review', 'approved', 'denied', 'withdrawn'),
-    submitted_at TIMESTAMP,
-    reviewed_by UUID REFERENCES users(id),
-    reviewed_at TIMESTAMP,
-    decision_notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Documents
-CREATE TABLE documents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    application_id UUID REFERENCES loan_applications(id),
-    document_type VARCHAR(50),
-    file_name VARCHAR(255),
-    file_path VARCHAR(500),
-    file_size INTEGER,
-    mime_type VARCHAR(100),
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    verified BOOLEAN DEFAULT FALSE,
-    verified_at TIMESTAMP
-);
-
--- Application activity log
-CREATE TABLE application_activities (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    application_id UUID REFERENCES loan_applications(id),
-    user_id UUID REFERENCES users(id),
-    action VARCHAR(100),
-    details JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - New user registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/verify-email` - Email verification
-
-### Member Portal
-- `GET /api/member/profile` - Get member profile
-- `PUT /api/member/profile` - Update member profile
-- `POST /api/applications` - Create new loan application
-- `GET /api/applications/:id` - Get application details
-- `PUT /api/applications/:id` - Update application
-- `POST /api/applications/:id/submit` - Submit application
-- `POST /api/applications/:id/documents` - Upload documents
-- `DELETE /api/applications/:id/documents/:docId` - Delete document
-
-### Credit Union Dashboard
-- `GET /api/admin/applications` - List all applications (with filters)
-- `GET /api/admin/applications/:id` - Get detailed application view
-- `PUT /api/admin/applications/:id/status` - Update application status
-- `POST /api/admin/applications/:id/notes` - Add internal notes
-- `POST /api/admin/applications/:id/messages` - Send message to applicant
-- `GET /api/admin/analytics` - Dashboard analytics
-
-## Security Considerations
-
-1. **Data Encryption**
-   - All sensitive data encrypted at rest (SSN, documents)
-   - TLS 1.3 for data in transit
-   - Field-level encryption for PII
-
-2. **Authentication & Authorization**
-   - JWT tokens with short expiration
-   - Refresh token rotation
-   - Role-based access control (RBAC)
-   - Multi-factor authentication for staff
-
-3. **Document Security**
-   - Secure file upload with virus scanning
-   - Signed URLs for document access
-   - Automatic document expiration
-
-4. **Compliance**
-   - GDPR/CCPA compliance
-   - Fair lending compliance tracking
-   - Audit logs for all actions
-
-## Development Phases
-
-### Phase 1: Foundation (Current)
-- Database schema design and implementation
-- Basic authentication system
-- Core API structure
-
-### Phase 2: Member Portal
-- Registration and profile management
-- Application creation workflow
-- Document upload system
-
-### Phase 3: Identity Verification
-- Third-party integration selection
-- ID verification implementation
-- Biometric matching
-
-### Phase 4: Credit Union Dashboard
-- Application review interface
-- Decision management system
-- Communication tools
-
-### Phase 5: Advanced Features
-- Automated decision engine
-- Analytics and reporting
-- Mobile application
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 14+
-- Redis (for session management)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/digitalloans.git
-
-# Install dependencies
-cd digitalloans
-npm install
-
-# Set up environment variables
-cp .env.example .env
-
-# Run database migrations
-npm run migrate
-
-# Start development server
-npm run dev
-```
-
-### Environment Variables
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/digitalloans
-
-# Authentication
-JWT_SECRET=your-secret-key
-JWT_REFRESH_SECRET=your-refresh-secret
-JWT_EXPIRATION=15m
-JWT_REFRESH_EXPIRATION=7d
-
-# File Storage
-STORAGE_TYPE=local # or 's3'
-AWS_BUCKET_NAME=your-bucket
-AWS_REGION=us-east-1
-
-# Email
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email
-SMTP_PASS=your-password
-```
-
-## Contributing
-
-Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Note:** This is a UI/UX prototype designed for demonstration and requirements gathering. It is not intended for production use and lacks many security features required for handling real financial data.
