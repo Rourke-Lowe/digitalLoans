@@ -17,13 +17,14 @@ model User {
   role          String        // 'member' | 'staff' | 'admin'
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  
+
   // Member relations
   applications  LoanApplication[]
-  
+
   // Staff relations
   reviewedApplications ApplicationReview[]
   activities    ApplicationActivity[]
+  statusChanges StatusHistory[]
 }
 
 model LoanProduct {
@@ -117,14 +118,21 @@ model LoanApplication {
   accountType         String?
   
   // Status
-  status              String      @default("draft") // draft, submitted, under_review, approved, denied, withdrawn
+  status              String      @default("SCREENING") // SCREENING, UNDERWRITING, DECISION_PENDING, APPROVED, REJECTED, DOCUMENT_PREPARATION, AWAITING_SIGNATURES, SIGNED, RELEASING, DISBURSED, COMPLETED, TO_LOS
   currentStep         Int         @default(1)
   submittedAt         DateTime?
-  
+  statusChangedAt     DateTime?
+  statusChangedBy     String?
+  losReferenceNumber  String?
+  losRoutingReason    String?
+  disbursementMethod  String?
+  disbursementDate    DateTime?
+  completionDate      DateTime?
+
   // Universa tracking for existing members
   universaData        String?     // JSON of original Universa data
   changedFields       String?     // JSON array of field names that were changed
-  
+
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   
@@ -133,6 +141,8 @@ model LoanApplication {
   documents           Document[]
   reviews             ApplicationReview[]
   activities          ApplicationActivity[]
+  statusHistory       StatusHistory[]
+  generatedDocuments  GeneratedDocument[]
 }
 
 model Document {
@@ -226,4 +236,48 @@ model ProductConfiguration {
   updatedAt             DateTime  @updatedAt
   
   product               LoanProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// New model for tracking status history
+model StatusHistory {
+  id              String          @id @default(cuid())
+  applicationId   String
+  fromStatus      String
+  toStatus        String
+  reason          String?
+  notes           String?
+  changedBy       String
+  changedAt       DateTime        @default(now())
+
+  application     LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [changedBy], references: [id])
+}
+
+// New model for document templates
+model DocumentTemplate {
+  id              String          @id @default(cuid())
+  name            String
+  type            String          // loan_agreement, disclosure, privacy_notice, etc.
+  templateContent String          // HTML or markdown template with merge fields
+  requiredFields  String          // JSON array of required merge fields
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// New model for generated documents
+model GeneratedDocument {
+  id              String          @id @default(cuid())
+  applicationId   String
+  documentName    String
+  documentType    String          // loan_agreement, disclosure, etc.
+  status          String          @default("generated") // generated, sent, viewed, signed
+  documentUrl     String
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  signedAt        DateTime?
+  signatureId     String?         // External signature provider ID (e.g., DocuSign envelope ID)
+  createdAt       DateTime        @default(now())
+
+  application     LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validateStatusTransition } from '@/lib/statusHelpers';
 
 export async function GET(
   request: Request,
@@ -46,25 +47,63 @@ export async function PATCH(
   try {
     const { id } = await params;
     const data = await request.json();
-    
+
     console.log('PATCH /api/applications/[id] - Received data:', {
       id,
       dataKeys: Object.keys(data),
-      firstName: data.firstName,
-      lastName: data.lastName,
-      streetNumber: data.streetNumber,
-      annualIncome: data.annualIncome,
-      hasUniversaData: !!data.universaData,
-      changedFields: data.changedFields
+      status: data.status,
+      hasStatusChange: !!data.status,
     });
-    
+
+    // Get current application for status validation
+    const currentApplication = await prisma.loanApplication.findUnique({
+      where: { id },
+    });
+
+    if (!currentApplication) {
+      return NextResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
+    }
+
+    // Validate status transition if status is being changed
+    if (data.status && data.status !== currentApplication.status) {
+      if (!validateStatusTransition(currentApplication.status, data.status)) {
+        return NextResponse.json(
+          { error: `Invalid status transition from ${currentApplication.status} to ${data.status}` },
+          { status: 400 }
+        );
+      }
+
+      // Log status history
+      await prisma.statusHistory.create({
+        data: {
+          applicationId: id,
+          fromStatus: currentApplication.status,
+          toStatus: data.status,
+          reason: data.statusReason || 'Status updated',
+          notes: data.statusNotes,
+          changedBy: data.userId || currentApplication.userId,
+        },
+      });
+
+      // Add status change timestamp and user
+      data.statusChangedAt = new Date();
+      data.statusChangedBy = data.userId || currentApplication.userId;
+    }
+
     // Remove fields that might not exist in the database yet to prevent errors
     const updateData = { ...data };
-    
+
+    // Clean up fields that aren't part of the schema
+    delete updateData.statusReason;
+    delete updateData.statusNotes;
+
     // Temporarily store and remove these fields if Prisma doesn't recognize them
     const universaData = updateData.universaData;
     const changedFields = updateData.changedFields;
-    
+
     // Try updating with all fields first
     let application;
     try {
@@ -81,7 +120,7 @@ export async function PATCH(
         console.log('Retrying without universaData and changedFields due to Prisma Client cache issue');
         delete updateData.universaData;
         delete updateData.changedFields;
-        
+
         application = await prisma.loanApplication.update({
           where: { id },
           data: {
@@ -89,7 +128,7 @@ export async function PATCH(
             updatedAt: new Date(),
           },
         });
-        
+
         // Try to update these fields separately with raw SQL as a workaround
         if (universaData || changedFields) {
           try {
@@ -110,12 +149,17 @@ export async function PATCH(
     }
 
     // Log activity
+    const actionType = data.status ? 'status_changed' : 'updated_application';
+    const details = data.status
+      ? `Status changed from ${currentApplication.status} to ${data.status}${data.statusReason ? `: ${data.statusReason}` : ''}`
+      : `Updated step ${data.currentStep || 'unknown'}`;
+
     await prisma.applicationActivity.create({
       data: {
         applicationId: id,
         userId: data.userId || application.userId,
-        action: 'updated_application',
-        details: `Updated step ${data.currentStep}`,
+        action: actionType,
+        details,
       },
     });
 

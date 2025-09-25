@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
 import FieldWithChangeIndicator from '@/components/ui/FieldWithChangeIndicator';
 import { LoanApplication, LoanProduct, User, Document, ApplicationReview, ApplicationActivity, CreditUnionSettings } from '@prisma/client';
+import { getAvailableStatuses, getStatusBadgeColor, getStageStatus, getProgressPercentage, getStatusReasons } from '@/lib/statusHelpers';
 
 interface ReviewInterfaceProps {
   application: LoanApplication & {
@@ -25,6 +26,11 @@ export default function ReviewInterface({ application, currentUser, settings }: 
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [decision, setDecision] = useState<'approved' | 'denied' | 'more_info_needed' | ''>('');
   const [showAllChanges, setShowAllChanges] = useState(false);
+  const [newStatus, setNewStatus] = useState('');
+  const [statusReason, setStatusReason] = useState('');
+  const [statusNotes, setStatusNotes] = useState('');
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [losReferenceNumber, setLosReferenceNumber] = useState('');
 
   // Parse Universa data and changed fields
   const universaData = application.universaData ? JSON.parse(application.universaData) : null;
@@ -54,6 +60,39 @@ export default function ReviewInterface({ application, currentUser, settings }: 
       if (newStatus === 'under_review') {
         router.refresh();
       }
+    } catch (error) {
+      alert('Failed to update status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async () => {
+    if (!newStatus) {
+      alert('Please select a new status');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await fetch(`/api/applications/${application.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          statusReason,
+          statusNotes,
+          userId: currentUser.id,
+          losReferenceNumber: newStatus === 'TO_LOS' ? losReferenceNumber : undefined,
+          losRoutingReason: newStatus === 'TO_LOS' ? statusReason : undefined,
+        }),
+      });
+
+      setShowStatusModal(false);
+      setNewStatus('');
+      setStatusReason('');
+      setStatusNotes('');
+      router.refresh();
     } catch (error) {
       alert('Failed to update status');
     } finally {
@@ -227,45 +266,166 @@ export default function ReviewInterface({ application, currentUser, settings }: 
             </div>
           )}
 
-          <div className="flex gap-4 mt-6">
-            {application.status === 'submitted' && (
+          {/* Quick Actions for legacy statuses */}
+          {['submitted', 'draft'].includes(application.status) && (
+            <div className="flex gap-4 mt-6">
               <button
-                onClick={() => handleStatusUpdate('under_review')}
+                onClick={() => handleStatusUpdate('SCREENING')}
                 disabled={loading}
-                className="btn-secondary"
+                className="btn-primary"
               >
-                START REVIEW
+                START SCREENING
               </button>
-            )}
-            {application.status === 'under_review' && (
-              <>
-                <button
-                  onClick={() => setShowDecisionModal(true)}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  REQUEST MORE INFO
-                </button>
-                <button
-                  onClick={() => {
-                    setDecision('denied');
-                    setShowDecisionModal(true);
-                  }}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  DENY
-                </button>
-                <button
-                  onClick={() => {
-                    setDecision('approved');
-                    setShowDecisionModal(true);
-                  }}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  APPROVE
-                </button>
-              </>
-            )}
+            </div>
+          )}
+        </div>
+
+        {/* Status Management Card */}
+        <div className="card mb-8">
+          <h3 className="font-semibold text-lg mb-4">APPLICATION STATUS MANAGEMENT</h3>
+
+          {/* Current Status Display */}
+          <div className="mb-4 p-3 bg-gray-50 rounded">
+            <span className="text-sm text-gray-600">Current Status:</span>
+            <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(application.status)}`}>
+              {application.status}
+            </span>
+            <span className="ml-2 text-sm text-gray-500">
+              (Since: {formatDate(application.statusChangedAt || application.updatedAt)})
+            </span>
           </div>
+
+          {/* Status Change Controls */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Change Status To:</label>
+              <select
+                className="w-full p-2 border rounded-lg"
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value)}
+              >
+                <option value="">Select new status...</option>
+                {getAvailableStatuses(application.status).map(status => (
+                  <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Reason for Change:</label>
+              <select
+                className="w-full p-2 border rounded-lg"
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+              >
+                <option value="">Select reason...</option>
+                {newStatus && getStatusReasons(application.status, newStatus).map(reason => (
+                  <option key={reason} value={reason}>{reason}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Special Routing Options */}
+          {(application.status === 'SCREENING' || application.status === 'UNDERWRITING') && (
+            <div className="mt-4 p-4 border-2 border-yellow-200 bg-yellow-50 rounded-lg">
+              <h4 className="font-medium text-yellow-900 mb-2">Route to LOS?</h4>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    setNewStatus('TO_LOS');
+                    setShowStatusModal(true);
+                  }}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                >
+                  Route to LOS
+                </button>
+                <input
+                  type="text"
+                  placeholder="LOS Reference Number (optional)"
+                  value={losReferenceNumber}
+                  onChange={(e) => setLosReferenceNumber(e.target.value)}
+                  className="flex-1 p-2 border rounded"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Notes Field */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-2">Status Change Notes:</label>
+            <textarea
+              className="w-full p-3 border rounded-lg h-24"
+              placeholder="Add notes about this status change..."
+              value={statusNotes}
+              onChange={(e) => setStatusNotes(e.target.value)}
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={handleStatusChange}
+              disabled={!newStatus || loading}
+              className="btn-primary"
+            >
+              {loading ? 'Updating...' : 'Update Status'}
+            </button>
+            <button
+              onClick={() => {
+                setNewStatus('');
+                setStatusReason('');
+                setStatusNotes('');
+              }}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        {/* Workflow Progress Visualization */}
+        <div className="card mb-8">
+          <h3 className="font-semibold text-lg mb-4">WORKFLOW PROGRESS</h3>
+
+          {/* Visual Pipeline */}
+          <div className="relative">
+            <div className="flex justify-between items-center">
+              {['SCREENING', 'UNDERWRITING', 'DECISION', 'DOCUMENTS', 'SIGNATURES', 'RELEASING', 'DISBURSED', 'COMPLETED'].map((stage, index) => (
+                <div key={stage} className="flex flex-col items-center flex-1">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm
+                    ${getStageStatus(stage, application.status) === 'completed' ? 'bg-green-500' :
+                      getStageStatus(stage, application.status) === 'current' ? 'bg-blue-500 animate-pulse' :
+                      'bg-gray-300'}`}>
+                    {getStageStatus(stage, application.status) === 'completed' ? '✓' : index + 1}
+                  </div>
+                  <span className="text-xs mt-1">{stage}</span>
+                </div>
+              ))}
+            </div>
+            {/* Progress Line */}
+            <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-300 -z-10"></div>
+            <div className="absolute top-5 left-0 h-0.5 bg-green-500 -z-10"
+                 style={{width: `${getProgressPercentage(application.status)}%`}}></div>
+          </div>
+
+          {/* Special Status Indicators */}
+          {application.status === 'TO_LOS' && (
+            <div className="mt-4 p-3 bg-gray-100 rounded">
+              <span className="font-medium">Routed to LOS</span>
+              {application.losReferenceNumber && (
+                <span className="ml-2 text-sm text-gray-600">
+                  (Reference: {application.losReferenceNumber})
+                </span>
+              )}
+            </div>
+          )}
+
+          {application.status === 'REJECTED' && (
+            <div className="mt-4 p-3 bg-red-100 rounded">
+              <span className="font-medium text-red-800">Application Rejected</span>
+            </div>
+          )}
         </div>
 
         {/* Main Content Grid */}
@@ -536,6 +696,192 @@ export default function ReviewInterface({ application, currentUser, settings }: 
             </div>
           </div>
         </div>
+
+        {/* Document Management Section */}
+        {['DOCUMENT_PREPARATION', 'AWAITING_SIGNATURES', 'SIGNED'].includes(application.status) && (
+          <div className="card mb-6">
+            <h3 className="font-semibold text-lg mb-4">DOCUMENT MANAGEMENT</h3>
+
+            {/* Document Generation (only in DOCUMENT_PREPARATION) */}
+            {application.status === 'DOCUMENT_PREPARATION' && (
+              <div className="mb-6">
+                <h4 className="font-medium mb-3">Generate Documents</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center p-3 border rounded hover:bg-gray-50">
+                    <input type="checkbox" className="mr-3" defaultChecked />
+                    <span className="flex-1">Loan Agreement</span>
+                    <button className="text-blue-600 text-sm">Preview Template</button>
+                  </label>
+                  <label className="flex items-center p-3 border rounded hover:bg-gray-50">
+                    <input type="checkbox" className="mr-3" defaultChecked />
+                    <span className="flex-1">Truth in Lending Disclosure</span>
+                    <button className="text-blue-600 text-sm">Preview Template</button>
+                  </label>
+                  <label className="flex items-center p-3 border rounded hover:bg-gray-50">
+                    <input type="checkbox" className="mr-3" defaultChecked />
+                    <span className="flex-1">Privacy Notice</span>
+                    <button className="text-blue-600 text-sm">Preview Template</button>
+                  </label>
+                  <label className="flex items-center p-3 border rounded hover:bg-gray-50">
+                    <input type="checkbox" className="mr-3" defaultChecked />
+                    <span className="flex-1">Auto-Debit Authorization</span>
+                    <button className="text-blue-600 text-sm">Preview Template</button>
+                  </label>
+                </div>
+                <button className="btn-primary mt-4">Generate Selected Documents</button>
+              </div>
+            )}
+
+            {/* Document Status Tracking */}
+            <div>
+              <h4 className="font-medium mb-3">Document Status</h4>
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-2 text-left text-sm">Document</th>
+                    <th className="p-2 text-left text-sm">Status</th>
+                    <th className="p-2 text-left text-sm">Sent</th>
+                    <th className="p-2 text-left text-sm">Viewed</th>
+                    <th className="p-2 text-left text-sm">Signed</th>
+                    <th className="p-2 text-left text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b">
+                    <td className="p-2">Loan Agreement</td>
+                    <td className="p-2">
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">Awaiting Signature</span>
+                    </td>
+                    <td className="p-2 text-sm">12/20/24 2:30pm</td>
+                    <td className="p-2 text-sm">12/20/24 3:45pm</td>
+                    <td className="p-2 text-sm">-</td>
+                    <td className="p-2">
+                      <button className="text-blue-600 text-sm mr-2">View</button>
+                      <button className="text-blue-600 text-sm">Resend</button>
+                    </td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="p-2">Disclosure Forms</td>
+                    <td className="p-2">
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Signed</span>
+                    </td>
+                    <td className="p-2 text-sm">12/20/24 2:30pm</td>
+                    <td className="p-2 text-sm">12/20/24 3:45pm</td>
+                    <td className="p-2 text-sm">12/20/24 4:15pm</td>
+                    <td className="p-2">
+                      <button className="text-blue-600 text-sm">Download</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* eSignature Integration Panel */}
+            {application.status === 'AWAITING_SIGNATURES' && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">eSignature Status</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">DocuSign Envelope ID: #ENV-2024-1220-001</span>
+                  <button className="text-blue-600 text-sm font-medium">Open in DocuSign</button>
+                </div>
+                <div className="mt-3">
+                  <button className="btn-secondary mr-2">Send Reminder</button>
+                  <button className="btn-secondary">Void & Regenerate</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Disbursement Management Section */}
+        {['RELEASING', 'DISBURSED', 'COMPLETED'].includes(application.status) && (
+          <div className="card mb-6">
+            <h3 className="font-semibold text-lg mb-4">DISBURSEMENT MANAGEMENT</h3>
+
+            {/* Pre-Disbursement Checklist (RELEASING) */}
+            {application.status === 'RELEASING' && (
+              <div className="mb-6">
+                <h4 className="font-medium mb-3">Pre-Disbursement Checklist</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-3" />
+                    <span>All documents signed and received</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-3" />
+                    <span>Final compliance review completed</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-3" />
+                    <span>Lien position verified (if applicable)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-3" />
+                    <span>Insurance requirements met</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-3" />
+                    <span>Funding source confirmed</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Disbursement Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Disbursement Method</label>
+                <select className="w-full p-2 border rounded-lg">
+                  <option>ACH Transfer</option>
+                  <option>Wire Transfer</option>
+                  <option>Check</option>
+                  <option>Internal Transfer</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Disbursement Date</label>
+                <input type="date" className="w-full p-2 border rounded-lg" />
+              </div>
+            </div>
+
+            {/* Account Details */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Disbursement Account</label>
+              <div className="p-3 bg-gray-50 rounded">
+                <p className="text-sm">Account: ****4567</p>
+                <p className="text-sm">Routing: ****8901</p>
+                <p className="text-sm">Name: {application.firstName} {application.lastName}</p>
+              </div>
+            </div>
+
+            {/* Disbursement Actions */}
+            <div className="mt-4 flex gap-3">
+              {application.status === 'RELEASING' && (
+                <button className="btn-primary">Initiate Disbursement</button>
+              )}
+              {application.status === 'DISBURSED' && (
+                <>
+                  <button className="btn-primary">Confirm Receipt</button>
+                  <button className="btn-secondary">View Transaction</button>
+                </>
+              )}
+            </div>
+
+            {/* Transaction Details (for DISBURSED/COMPLETED) */}
+            {['DISBURSED', 'COMPLETED'].includes(application.status) && (
+              <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                <h4 className="font-medium text-green-900 mb-2">Transaction Details</h4>
+                <div className="space-y-1 text-sm">
+                  <p>Transaction ID: TXN-2024-{application.applicationNumber}</p>
+                  <p>Amount: ${application.amount.toLocaleString()}</p>
+                  <p>Method: {application.disbursementMethod || 'ACH Transfer'}</p>
+                  <p>Initiated: {application.disbursementDate ? formatDate(application.disbursementDate) : '12/20/2024 10:30 AM'}</p>
+                  <p>Completed: {application.completionDate ? formatDate(application.completionDate) : '12/20/2024 10:35 AM'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Decision Modal */}
         {showDecisionModal && (

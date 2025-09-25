@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Header from '@/components/ui/Header';
 import Link from 'next/link';
+import { getStatusBadgeColor } from '@/lib/statusHelpers';
 
 export default async function StaffDashboard() {
   const user = await getCurrentUser();
@@ -11,17 +12,49 @@ export default async function StaffDashboard() {
     redirect('/');
   }
 
-  // Get applications with different statuses
-  const [submitted, underReview, approved, denied] = await Promise.all([
-    prisma.loanApplication.count({ where: { status: 'submitted' } }),
-    prisma.loanApplication.count({ where: { status: 'under_review' } }),
-    prisma.loanApplication.count({ where: { status: 'approved' } }),
-    prisma.loanApplication.count({ where: { status: 'denied' } }),
+  // Get applications with different statuses (both legacy and new)
+  const [screening, underwriting, decisionPending, approved, rejected] = await Promise.all([
+    prisma.loanApplication.count({
+      where: {
+        status: {
+          in: ['SCREENING', 'submitted'] // Handle both new and legacy statuses
+        }
+      }
+    }),
+    prisma.loanApplication.count({
+      where: {
+        status: {
+          in: ['UNDERWRITING', 'under_review'] // Handle both new and legacy statuses
+        }
+      }
+    }),
+    prisma.loanApplication.count({ where: { status: 'DECISION_PENDING' } }),
+    prisma.loanApplication.count({
+      where: {
+        status: {
+          in: ['APPROVED', 'approved'] // Handle both new and legacy statuses
+        }
+      }
+    }),
+    prisma.loanApplication.count({
+      where: {
+        status: {
+          in: ['REJECTED', 'denied'] // Handle both new and legacy statuses
+        }
+      }
+    }),
   ]);
 
   const recentApplications = await prisma.loanApplication.findMany({
-    where: { status: { in: ['submitted', 'under_review'] } },
-    include: { 
+    where: {
+      status: {
+        in: [
+          'SCREENING', 'UNDERWRITING', 'DECISION_PENDING',
+          'submitted', 'under_review' // Include legacy statuses too
+        ]
+      }
+    },
+    include: {
       user: true,
       product: true,
     },
@@ -30,10 +63,11 @@ export default async function StaffDashboard() {
   });
 
   const stats = [
-    { label: 'Pending Review', value: submitted, color: 'bg-blue-100 text-blue-800' },
-    { label: 'Under Review', value: underReview, color: 'bg-yellow-100 text-yellow-800' },
+    { label: 'In Screening', value: screening, color: 'bg-purple-100 text-purple-800' },
+    { label: 'Underwriting', value: underwriting, color: 'bg-indigo-100 text-indigo-800' },
+    { label: 'Decision Pending', value: decisionPending, color: 'bg-yellow-100 text-yellow-800' },
     { label: 'Approved', value: approved, color: 'bg-green-100 text-green-800' },
-    { label: 'Denied', value: denied, color: 'bg-red-100 text-red-800' },
+    { label: 'Rejected', value: rejected, color: 'bg-red-100 text-red-800' },
   ];
 
   const formatDate = (date: Date | null) => {
@@ -130,10 +164,8 @@ export default async function StaffDashboard() {
                       ${app.amount.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        app.status === 'submitted' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {app.status.replace('_', ' ').toUpperCase()}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(app.status)}`}>
+                        {app.status.replace(/_/g, ' ').toUpperCase()}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
